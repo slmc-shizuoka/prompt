@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- スマホ・ホーム画面用のメタタグ -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Prompt-X">
+    <title>Prompt-X | プロンプト管理ツール</title>
+    <!-- Tailwind CSS (スタイリング用) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwindのダークモードをclassベースで制御するための設定
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <!-- FontAwesome (アイコン用) v6.4.2 (Xロゴ対応) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        /* カスタムスクロールバーのスタイリング */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #ffffff; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e5e7eb; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d1d5db; 
+        }
+        /* ダークモード時のスクロールバー */
+        .dark ::-webkit-scrollbar-track {
+            background: #111827; /* gray-900 */
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151; /* gray-700 */
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563; /* gray-600 */
+        }
+        
+        /* トランジション用のユーティリティ */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 300ms, transform 300ms;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 font-sans h-screen overflow-hidden flex flex-col md:flex-row transition-colors duration-200">
+
+    <!-- サイドバー (リスト表示エリア) -->
+    <aside class="w-full md:w-96 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col h-1/3 md:h-full z-10 transition-all duration-200">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold text-black dark:text-white flex items-center gap-2">
+                    <i class="fa-brands fa-x-twitter text-2xl"></i> Prompt-X
+                </h1>
+                <div class="flex gap-1">
+                    <button id="btn-settings" class="p-2 w-9 h-9 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors tooltip" title="設定">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button id="btn-templates" class="p-2 w-9 h-9 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors tooltip" title="フォーマット(テンプレート)">
+                        <i class="fas fa-clipboard-list"></i>
+                    </button>
+                    <button id="btn-import-csv" class="p-2 w-9 h-9 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors tooltip" title="CSVインポート">
+                        <i class="fas fa-file-import"></i>
+                    </button>
+                    <input type="file" id="input-import-csv" accept=".csv" class="hidden">
+                    <button id="btn-export-csv" class="p-2 w-9 h-9 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors tooltip" title="CSVエクスポート">
+                        <i class="fas fa-file-csv"></i>
+                    </button>
+                    <button id="btn-new-prompt" class="p-2 w-9 h-9 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors tooltip" title="新規作成">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- 検索ボックス -->
+            <div class="relative">
+                <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm"></i>
+                <input type="text" id="input-search" placeholder="プロンプトを検索" 
+                    class="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-900 border border-transparent rounded-full text-sm focus:outline-none focus:bg-white dark:focus:bg-gray-950 focus:ring-1 focus:ring-black dark:focus:ring-gray-500 focus:border-black dark:focus:border-gray-500 transition-all text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500">
+            </div>
+            <!-- アーカイブ切り替えタブ -->
+            <div class="flex border-b border-gray-200 dark:border-gray-800 text-sm font-bold mt-1">
+                <button id="tab-active" class="flex-1 py-2 text-black dark:text-white border-b-2 border-black dark:border-white transition-colors">アクティブ</button>
+                <button id="tab-archived" class="flex-1 py-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors">アーカイブ</button>
+            </div>
+        </div>
+        
+        <!-- プロンプトリスト -->
+        <div class="flex-1 overflow-y-auto p-2" id="prompt-list">
+            <!-- JSで動的にリストが生成されます -->
+            <div class="text-center text-gray-500 dark:text-gray-400 mt-10 text-sm hidden" id="empty-state-list">
+                プロンプトがありません。<br>右上の「+」からポストしてください。
+            </div>
+        </div>
+    </aside>
+
+    <!-- メインエディタエリア -->
+    <main class="flex-1 flex flex-col h-2/3 md:h-full bg-white dark:bg-gray-950 relative transition-colors duration-200">
+        <!-- 未選択時のプレースホルダー -->
+        <div id="editor-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 bg-white dark:bg-gray-950 z-20">
+            <i class="fa-brands fa-x-twitter text-5xl mb-4 text-gray-200 dark:text-gray-800"></i>
+            <p class="text-gray-500 dark:text-gray-400 font-medium">プロンプトを選択するか、<br>新しく作成してください。</p>
+        </div>
+
+        <!-- エディタ本体 -->
+        <div id="editor-container" class="flex-1 flex flex-col h-full hidden p-4 md:p-8 gap-4 max-w-4xl mx-auto w-full">
+            
+            <div class="flex items-center gap-2">
+                <input type="text" id="input-title" placeholder="タイトル" 
+                    class="flex-1 text-2xl md:text-3xl font-black bg-transparent border-b border-transparent hover:border-gray-200 dark:hover:border-gray-700 focus:border-black dark:focus:border-white focus:outline-none transition-colors px-0 py-2 w-full text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-600">
+                <button id="btn-pin" class="w-10 h-10 shrink-0 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white rounded-full transition-colors tooltip" title="ピン留め">
+                    <i class="fas fa-thumbtack text-xl"></i>
+                </button>
+            </div>
+
+            <!-- タグ入力エリア -->
+            <div class="flex flex-col gap-2 pb-2">
+                <div id="tags-container" class="flex flex-wrap gap-2 empty:hidden"></div>
+                <div class="flex items-center gap-2 relative">
+                    <i class="fas fa-hashtag text-gray-400 dark:text-gray-500"></i>
+                    <input type="text" id="input-tag" placeholder="タグを追加..." autocomplete="off"
+                        class="text-sm bg-transparent border-b border-transparent focus:border-black dark:focus:border-white focus:outline-none transition-colors px-1 py-1 w-full max-w-xs text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500">
+                    
+                    <!-- タグサジェストリスト -->
+                    <div id="tag-suggestions" class="absolute top-full left-6 mt-1 w-48 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg hidden flex-col z-30 py-1">
+                        <!-- JSで追加 -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col gap-1 min-h-0 relative group">
+                <textarea id="input-content" placeholder="いまどうしてる？（プロンプトを入力）" 
+                    class="flex-1 w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-black dark:focus:ring-gray-500 focus:border-black dark:focus:border-gray-500 focus:outline-none resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 leading-relaxed font-mono text-[15px] transition-all"></textarea>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800 mt-auto">
+                <div class="text-xs text-gray-400 font-medium" id="last-edited-text"></div>
+                <div class="flex items-center gap-1 md:gap-2">
+                    <button id="btn-delete" class="w-10 h-10 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors tooltip" title="削除">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    <button id="btn-copy" class="w-10 h-10 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full transition-colors tooltip" title="コピー">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    
+                    <!-- フォーマット挿入用ドロップダウン -->
+                    <div class="relative">
+                        <button id="btn-insert-dropdown" class="w-10 h-10 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full transition-colors tooltip" title="フォーマット挿入">
+                            <i class="fas fa-clipboard-list"></i>
+                        </button>
+                        <!-- メニュー (上方向にポップアップ) -->
+                        <div id="dropdown-template-list" class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 w-48 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl hidden flex-col py-2 z-30 origin-bottom">
+                            <!-- JSで追加 -->
+                        </div>
+                    </div>
+
+                    <button id="btn-archive" class="w-10 h-10 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full transition-colors tooltip" title="アーカイブ">
+                        <i class="fas fa-box-archive"></i>
+                    </button>
+
+                    <button id="btn-share-email" class="w-10 h-10 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full transition-colors tooltip" title="メールで共有">
+                        <i class="fas fa-envelope"></i>
+                    </button>
+                    
+                    <button id="btn-save" class="px-5 md:px-6 py-2 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black rounded-full font-bold shadow-sm transition-colors text-sm flex items-center gap-2 ml-1 md:ml-2">
+                        <i class="fas fa-check"></i> 保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 設定モーダル -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-11/12 max-w-md p-6 transform scale-95 transition-transform duration-300">
+            <h2 class="text-xl font-bold mb-6 text-black dark:text-white flex items-center"><i class="fas fa-cog mr-2"></i>設定</h2>
+            
+            <div class="mb-5">
+                <label class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">送信先メールアドレス</label>
+                <div class="flex gap-2 mb-2">
+                    <input type="email" id="input-new-email" placeholder="追加するメールアドレス" 
+                        class="flex-1 p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-black dark:text-white rounded-xl focus:ring-1 focus:ring-black dark:focus:ring-gray-500 focus:border-black dark:focus:border-gray-500 focus:outline-none transition-all text-sm">
+                    <button id="btn-add-email" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-black dark:text-white font-bold rounded-xl transition-colors text-sm">追加</button>
+                </div>
+                <ul id="settings-email-list" class="max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl p-2 empty:hidden flex flex-col gap-1"></ul>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">複数登録できます。共有時に一覧から宛先を選択して一斉送信可能です。</p>
+            </div>
+
+            <div class="mb-5 border-t border-gray-100 dark:border-gray-800 pt-4">
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="flex items-center h-5 mt-0.5">
+                        <input type="checkbox" id="input-use-gmail" class="w-4 h-4 text-black bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-black dark:focus:ring-gray-500">
+                    </div>
+                    <div>
+                        <span class="text-sm font-bold text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-white transition-colors">Web版Gmailを使用して送信する</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">チェックを入れると、ブラウザの新しいタブで直接Gmailの作成画面が開きます。外すとOS標準のメールアプリが起動します。</p>
+                    </div>
+                </label>
+            </div>
+
+            <div class="mb-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+                <label class="flex items-start gap-3 cursor-pointer group">
+                    <div class="flex items-center h-5 mt-0.5">
+                        <input type="checkbox" id="input-dark-mode" class="w-4 h-4 text-black bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-black dark:focus:ring-gray-500">
+                    </div>
+                    <div>
+                        <span class="text-sm font-bold text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-white transition-colors">ダークモードを有効にする</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">目に優しい暗い配色に切り替えます。</p>
+                    </div>
+                </label>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-8">
+                <button id="btn-close-settings" class="px-5 py-2 text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-sm font-bold">キャンセル</button>
+                <button id="btn-save-settings" class="px-6 py-2 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black rounded-full shadow-sm transition-colors text-sm font-bold">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 共有モーダル -->
+    <div id="share-modal" class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-11/12 max-w-sm p-6 transform scale-95 transition-transform duration-300">
+            <h2 class="text-xl font-bold mb-4 text-black dark:text-white flex items-center"><i class="fas fa-paper-plane mr-2"></i>送信先の選択</h2>
+            
+            <div class="mb-4">
+                <div id="share-email-list" class="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl p-2 empty:hidden flex flex-col gap-1">
+                    <!-- JSで動的に追加 -->
+                </div>
+                <p id="share-no-email-msg" class="text-sm text-gray-500 dark:text-gray-400 hidden p-2">メールアドレスが登録されていません。<br>設定(<i class="fas fa-cog"></i>)から登録してください。</p>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="btn-close-share" class="px-5 py-2 text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-sm font-bold">キャンセル</button>
+                <button id="btn-execute-share" class="px-6 py-2 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black rounded-full shadow-sm transition-colors text-sm font-bold">一斉送信</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- テンプレートモーダル -->
+    <div id="templates-modal" class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-11/12 max-w-lg p-6 transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]">
+            <div class="flex items-center justify-between mb-4 shrink-0">
+                <h2 class="text-xl font-bold text-black dark:text-white flex items-center"><i class="fas fa-clipboard-list mr-2"></i>フォーマット（テンプレート）</h2>
+                <button id="btn-close-templates-icon" class="text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto pr-2 flex-1 space-y-6 flex flex-col">
+                <!-- 新規登録エリア -->
+                <div class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shrink-0">
+                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">新しいフォーマットを登録</h3>
+                    <input type="text" id="input-template-title" placeholder="フォーマット名 (例: ブログ記事用)" 
+                        class="w-full p-2 mb-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-black dark:focus:ring-gray-500 focus:border-black dark:focus:border-gray-500 focus:outline-none transition-all text-sm text-black dark:text-white">
+                    <textarea id="input-template-content" placeholder="自動入力される内容を入力..." 
+                        class="w-full p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-black dark:focus:ring-gray-500 focus:border-black dark:focus:border-gray-500 focus:outline-none resize-y text-sm h-24 transition-all text-black dark:text-white"></textarea>
+                    <div class="flex justify-end mt-2">
+                        <button id="btn-add-template" class="px-4 py-2 bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black rounded-full shadow-sm transition-colors text-xs font-bold">
+                            追加して保存
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 登録済みリスト -->
+                <div class="flex flex-col min-h-0 flex-1">
+                    <div class="flex items-center justify-between mb-3 shrink-0">
+                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200">保存済みのフォーマット（管理）</h3>
+                    </div>
+                    <div id="templates-list" class="flex flex-col gap-2 empty:hidden overflow-y-auto pb-2 pr-1">
+                        <!-- JSで動的に追加 -->
+                    </div>
+                    <p id="templates-empty-msg" class="text-sm text-gray-500 dark:text-gray-400 hidden text-center py-4">保存されたフォーマットはありません。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast通知コンテナ -->
+    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        /**
+         * アプリケーションの状態とロジックを管理するメインオブジェクト
+         */
+        const PromptApp = {
+            data: {
+                prompts: [],
+                templates: [],
+                currentId: null,
+                currentTags: [],
+                searchQuery: '',
+                currentTab: 'active', // 'active' または 'archived'
+                tempEmails: [], 
+                settings: {
+                    emails: [],
+                    useGmailWeb: true,
+                    darkMode: false // ダークモードの設定
+                }
+            },
+            
+            dom: {},
+
+            init() {
+                this.setupIcons(); // ファビコンとホーム画面アイコンを動的生成
+                this.cacheDOM();
+                this.loadSettings();
+                this.applyDarkMode(); // 初期化時にダークモード反映
+                this.loadTemplates();
+                this.loadData();
+                this.bindEvents();
+                this.renderTemplatesDropdown();
+                this.updateTabUI();
+                this.renderList();
+                this.updateEditorState();
+            },
+
+            // --- アイコン生成 ---
+            setupIcons() {
+                try {
+                    // Canvasを使ってXのロゴをPNG画像として生成
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 512;
+                    canvas.height = 512;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 背景を黒に
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, 512, 512);
+                    
+                    // Xのロゴを描画（白）
+                    ctx.fillStyle = '#ffffff';
+                    // FontAwesomeのXロゴのSVGパスデータ
+                    const path = new Path2D("M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z");
+                    ctx.fill(path);
+
+                    // PNGデータURLに変換
+                    const dataUrl = canvas.toDataURL('image/png');
+
+                    // ファビコン (PCブラウザのタブ用)
+                    let iconLink = document.querySelector("link[rel~='icon']");
+                    if (!iconLink) {
+                        iconLink = document.createElement('link');
+                        iconLink.rel = 'icon';
+                        document.head.appendChild(iconLink);
+                    }
+                    iconLink.href = dataUrl;
+
+                    // Apple Touch Icon (iOS/Androidのホーム画面・お気に入り用)
+                    let appleLink = document.querySelector("link[rel='apple-touch-icon']");
+                    if (!appleLink) {
+                        appleLink = document.createElement('link');
+                        appleLink.rel = 'apple-touch-icon';
+                        document.head.appendChild(appleLink);
+                    }
+                    appleLink.href = dataUrl;
+                } catch (e) {
+                    console.error("アイコンの生成に失敗しました:", e);
+                }
+            },
+
+            cacheDOM() {
+                this.dom = {
+                    list: document.getElementById('prompt-list'),
+                    emptyList: document.getElementById('empty-state-list'),
+                    placeholder: document.getElementById('editor-placeholder'),
+                    editorContainer: document.getElementById('editor-container'),
+                    titleInput: document.getElementById('input-title'),
+                    btnPin: document.getElementById('btn-pin'),
+                    tagsContainer: document.getElementById('tags-container'),
+                    inputTag: document.getElementById('input-tag'),
+                    tagSuggestions: document.getElementById('tag-suggestions'), // 追加
+                    contentInput: document.getElementById('input-content'),
+                    lastEdited: document.getElementById('last-edited-text'),
+                    
+                    // Main Buttons
+                    btnNew: document.getElementById('btn-new-prompt'),
+                    btnSave: document.getElementById('btn-save'),
+                    btnDelete: document.getElementById('btn-delete'),
+                    btnCopy: document.getElementById('btn-copy'),
+                    btnArchive: document.getElementById('btn-archive'),
+                    btnInsertDropdown: document.getElementById('btn-insert-dropdown'),
+                    dropdownTemplateList: document.getElementById('dropdown-template-list'),
+                    btnShareEmail: document.getElementById('btn-share-email'),
+                    btnExportCSV: document.getElementById('btn-export-csv'),
+                    btnImportCSV: document.getElementById('btn-import-csv'),
+                    inputImportCSV: document.getElementById('input-import-csv'),
+                    searchInput: document.getElementById('input-search'),
+                    
+                    // Tabs
+                    tabActive: document.getElementById('tab-active'),
+                    tabArchived: document.getElementById('tab-archived'),
+
+                    // Settings
+                    btnSettings: document.getElementById('btn-settings'),
+                    btnTemplates: document.getElementById('btn-templates'),
+                    settingsModal: document.getElementById('settings-modal'),
+                    inputNewEmail: document.getElementById('input-new-email'),
+                    btnAddEmail: document.getElementById('btn-add-email'),
+                    settingsEmailList: document.getElementById('settings-email-list'),
+                    inputUseGmail: document.getElementById('input-use-gmail'),
+                    inputDarkMode: document.getElementById('input-dark-mode'),
+                    btnCloseSettings: document.getElementById('btn-close-settings'),
+                    btnSaveSettings: document.getElementById('btn-save-settings'),
+
+                    // Templates Modal
+                    templatesModal: document.getElementById('templates-modal'),
+                    btnCloseTemplatesIcon: document.getElementById('btn-close-templates-icon'),
+                    inputTemplateTitle: document.getElementById('input-template-title'),
+                    inputTemplateContent: document.getElementById('input-template-content'),
+                    btnAddTemplate: document.getElementById('btn-add-template'),
+                    templatesList: document.getElementById('templates-list'),
+                    templatesEmptyMsg: document.getElementById('templates-empty-msg'),
+
+                    // Share
+                    shareModal: document.getElementById('share-modal'),
+                    shareEmailList: document.getElementById('share-email-list'),
+                    shareNoEmailMsg: document.getElementById('share-no-email-msg'),
+                    btnCloseShare: document.getElementById('btn-close-share'),
+                    btnExecuteShare: document.getElementById('btn-execute-share')
+                };
+            },
+
+            bindEvents() {
+                this.dom.btnNew.addEventListener('click', () => this.createNewPrompt());
+                this.dom.btnSave.addEventListener('click', () => this.saveCurrentPrompt());
+                this.dom.btnDelete.addEventListener('click', () => this.deleteCurrentPrompt());
+                this.dom.btnCopy.addEventListener('click', () => this.copyToClipboard());
+                this.dom.btnArchive.addEventListener('click', () => this.toggleArchiveCurrent());
+                this.dom.btnPin.addEventListener('click', () => this.togglePinCurrent());
+                
+                // ドロップダウン開閉の制御
+                this.dom.btnInsertDropdown.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.dom.dropdownTemplateList.classList.toggle('hidden');
+                    this.dom.dropdownTemplateList.classList.toggle('flex');
+                });
+                document.addEventListener('click', (e) => {
+                    if (this.dom.dropdownTemplateList && !this.dom.dropdownTemplateList.contains(e.target)) {
+                        this.dom.dropdownTemplateList.classList.add('hidden');
+                        this.dom.dropdownTemplateList.classList.remove('flex');
+                    }
+                    // タグサジェストの外側クリックで閉じる処理を追加
+                    if (this.dom.tagSuggestions && !this.dom.tagSuggestions.contains(e.target) && e.target !== this.dom.inputTag) {
+                        this.dom.tagSuggestions.classList.add('hidden');
+                        this.dom.tagSuggestions.classList.remove('flex');
+                    }
+                });
+
+                this.dom.btnShareEmail.addEventListener('click', () => this.openShareModal());
+                this.dom.btnExportCSV.addEventListener('click', () => this.exportToCSV());
+                this.dom.btnImportCSV.addEventListener('click', () => this.dom.inputImportCSV.click());
+                this.dom.inputImportCSV.addEventListener('change', (e) => this.importFromCSV(e));
+                this.dom.searchInput.addEventListener('input', (e) => this.handleSearch(e));
+                
+                // タグ入力のイベント
+                this.dom.inputTag.addEventListener('keydown', (e) => this.handleTagInput(e));
+                this.dom.inputTag.addEventListener('input', (e) => this.handleTagSuggest(e));
+                this.dom.inputTag.addEventListener('focus', (e) => this.handleTagSuggest(e));
+
+                // Tabs
+                this.dom.tabActive.addEventListener('click', () => this.switchTab('active'));
+                this.dom.tabArchived.addEventListener('click', () => this.switchTab('archived'));
+
+                // Settings
+                this.dom.btnSettings.addEventListener('click', () => this.openSettingsModal());
+                this.dom.btnCloseSettings.addEventListener('click', () => this.closeSettingsModal());
+                this.dom.btnSaveSettings.addEventListener('click', () => this.saveSettings());
+                
+                // Templates
+                this.dom.btnTemplates.addEventListener('click', () => this.openTemplatesModal());
+                this.dom.btnCloseTemplatesIcon.addEventListener('click', () => this.closeTemplatesModal());
+                this.dom.btnAddTemplate.addEventListener('click', () => this.addTemplate());
+
+                this.dom.inputNewEmail.addEventListener('keydown', (e) => {
+                    if (e.isComposing) return;
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.addEmailToSettings();
+                    }
+                });
+                this.dom.btnAddEmail.addEventListener('click', () => this.addEmailToSettings());
+
+                // Share Modal
+                this.dom.btnCloseShare.addEventListener('click', () => this.closeShareModal());
+                this.dom.btnExecuteShare.addEventListener('click', () => this.executeShare());
+                
+                // Modals outer click
+                this.dom.settingsModal.addEventListener('click', (e) => {
+                    if (e.target === this.dom.settingsModal) this.closeSettingsModal();
+                });
+                this.dom.templatesModal.addEventListener('click', (e) => {
+                    if (e.target === this.dom.templatesModal) this.closeTemplatesModal();
+                });
+                this.dom.shareModal.addEventListener('click', (e) => {
+                    if (e.target === this.dom.shareModal) this.closeShareModal();
+                });
+            },
+            
+            // --- タブ管理 ---
+            switchTab(tabName) {
+                this.data.currentTab = tabName;
+                this.updateTabUI();
+                
+                // アーカイブとアクティブを切り替えた時に、現在のIDがそのタブに含まれていなければ選択を外す
+                const currentPrompt = this.data.prompts.find(p => p.id === this.data.currentId);
+                if (currentPrompt) {
+                    if ((tabName === 'active' && currentPrompt.isArchived) || 
+                        (tabName === 'archived' && !currentPrompt.isArchived)) {
+                        this.data.currentId = null;
+                        this.updateEditorState();
+                    }
+                }
+                
+                this.renderList();
+            },
+
+            updateTabUI() {
+                if (this.data.currentTab === 'active') {
+                    this.dom.tabActive.className = 'flex-1 py-2 text-black dark:text-white border-b-2 border-black dark:border-white transition-colors';
+                    this.dom.tabArchived.className = 'flex-1 py-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors';
+                } else {
+                    this.dom.tabArchived.className = 'flex-1 py-2 text-black dark:text-white border-b-2 border-black dark:border-white transition-colors';
+                    this.dom.tabActive.className = 'flex-1 py-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors';
+                }
+            },
+
+            // --- ダークモード ---
+            applyDarkMode() {
+                if (this.data.settings.darkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            },
+
+            // --- 設定 ---
+            loadSettings() {
+                try {
+                    const stored = localStorage.getItem('prompt_manager_settings');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.defaultEmail && !parsed.emails) {
+                            parsed.emails = [parsed.defaultEmail];
+                            delete parsed.defaultEmail;
+                        }
+                        if (!parsed.emails) parsed.emails = [];
+                        if (parsed.darkMode === undefined) parsed.darkMode = false;
+
+                        this.data.settings = { ...this.data.settings, ...parsed };
+                    }
+                } catch (e) {
+                    console.error("設定の読み込みに失敗しました:", e);
+                }
+            },
+
+            saveSettings() {
+                this.data.settings.emails = [...this.data.tempEmails];
+                this.data.settings.useGmailWeb = this.dom.inputUseGmail.checked;
+                this.data.settings.darkMode = this.dom.inputDarkMode.checked;
+                
+                try {
+                    localStorage.setItem('prompt_manager_settings', JSON.stringify(this.data.settings));
+                    this.applyDarkMode(); // 保存時にダークモード反映
+                    this.closeSettingsModal();
+                    this.showToast("設定を保存しました", "success");
+                } catch (e) {
+                    console.error("設定の保存に失敗しました:", e);
+                    this.showToast("設定の保存に失敗しました", "error");
+                }
+            },
+
+            addEmailToSettings() {
+                const email = this.dom.inputNewEmail.value.trim();
+                if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    if (!this.data.tempEmails.includes(email)) {
+                        this.data.tempEmails.push(email);
+                        this.dom.inputNewEmail.value = '';
+                        this.renderSettingsEmailList();
+                    } else {
+                        this.showToast("既に登録されています", "error");
+                    }
+                } else {
+                    this.showToast("有効なメールアドレスを入力してください", "error");
+                }
+            },
+
+            renderSettingsEmailList() {
+                this.dom.settingsEmailList.innerHTML = '';
+                this.data.tempEmails.forEach((email, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between py-1.5 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors';
+                    li.innerHTML = `
+                        <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${email}</span>
+                        <button type="button" class="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors tooltip" title="削除">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    li.querySelector('button').addEventListener('click', () => {
+                        this.data.tempEmails.splice(index, 1);
+                        this.renderSettingsEmailList();
+                    });
+                    this.dom.settingsEmailList.appendChild(li);
+                });
+            },
+
+            openSettingsModal() {
+                this.data.tempEmails = [...this.data.settings.emails];
+                this.dom.inputNewEmail.value = '';
+                this.renderSettingsEmailList();
+                
+                this.dom.inputUseGmail.checked = this.data.settings.useGmailWeb !== false;
+                this.dom.inputDarkMode.checked = this.data.settings.darkMode === true;
+                
+                this.dom.settingsModal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    this.dom.settingsModal.classList.remove('opacity-0');
+                    this.dom.settingsModal.firstElementChild.classList.remove('scale-95');
+                });
+            },
+
+            closeSettingsModal() {
+                this.dom.settingsModal.classList.add('opacity-0');
+                this.dom.settingsModal.firstElementChild.classList.add('scale-95');
+                setTimeout(() => {
+                    this.dom.settingsModal.classList.add('hidden');
+                }, 300);
+            },
+
+            // --- フォーマット(テンプレート) ---
+            loadTemplates() {
+                try {
+                    const stored = localStorage.getItem('prompt_manager_templates');
+                    if (stored) {
+                        this.data.templates = JSON.parse(stored);
+                    } else {
+                        if (this.data.settings.defaultTemplate) {
+                            this.data.templates = [{
+                                id: crypto.randomUUID ? crypto.randomUUID() : `tmpl_${Date.now()}`,
+                                title: "デフォルトテンプレート",
+                                content: this.data.settings.defaultTemplate,
+                                isFavorite: false
+                            }];
+                            delete this.data.settings.defaultTemplate;
+                            localStorage.setItem('prompt_manager_settings', JSON.stringify(this.data.settings));
+                        } else {
+                            this.data.templates = [];
+                        }
+                    }
+                } catch (e) {
+                    console.error("テンプレートの読み込みに失敗しました:", e);
+                    this.data.templates = [];
+                }
+            },
+
+            saveTemplates() {
+                try {
+                    localStorage.setItem('prompt_manager_templates', JSON.stringify(this.data.templates));
+                } catch (e) {
+                    console.error("テンプレートの保存に失敗しました:", e);
+                }
+            },
+
+            openTemplatesModal() {
+                this.dom.inputTemplateTitle.value = '';
+                this.dom.inputTemplateContent.value = '';
+                this.renderTemplatesList();
+                
+                this.dom.templatesModal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    this.dom.templatesModal.classList.remove('opacity-0');
+                    this.dom.templatesModal.firstElementChild.classList.remove('scale-95');
+                });
+            },
+
+            closeTemplatesModal() {
+                this.dom.templatesModal.classList.add('opacity-0');
+                this.dom.templatesModal.firstElementChild.classList.add('scale-95');
+                setTimeout(() => {
+                    this.dom.templatesModal.classList.add('hidden');
+                }, 300);
+            },
+
+            addTemplate() {
+                const title = this.dom.inputTemplateTitle.value.trim() || "無題のフォーマット";
+                const content = this.dom.inputTemplateContent.value;
+
+                if (!content.trim()) {
+                    this.showToast("フォーマット内容を入力してください", "error");
+                    return;
+                }
+
+                const newTmpl = {
+                    id: crypto.randomUUID ? crypto.randomUUID() : `tmpl_${Date.now()}`,
+                    title,
+                    content,
+                    isFavorite: false
+                };
+                
+                this.data.templates.push(newTmpl);
+                this.saveTemplates();
+                this.renderTemplatesList();
+                this.renderTemplatesDropdown(); 
+                
+                this.dom.inputTemplateTitle.value = '';
+                this.dom.inputTemplateContent.value = '';
+                this.showToast("フォーマットを保存しました", "success");
+            },
+
+            deleteTemplate(id) {
+                this.data.templates = this.data.templates.filter(t => t.id !== id);
+                this.saveTemplates();
+                this.renderTemplatesList();
+                this.renderTemplatesDropdown();
+                this.showToast("フォーマットを削除しました", "info");
+            },
+
+            toggleFavoriteTemplate(id) {
+                const tmpl = this.data.templates.find(t => t.id === id);
+                if (tmpl) {
+                    tmpl.isFavorite = !tmpl.isFavorite;
+                    this.saveTemplates();
+                    this.renderTemplatesList();
+                    this.renderTemplatesDropdown();
+                }
+            },
+
+            renderTemplatesDropdown() {
+                if (!this.dom.dropdownTemplateList) return;
+                
+                this.dom.dropdownTemplateList.innerHTML = '';
+                
+                if (this.data.templates.length === 0) {
+                    this.dom.dropdownTemplateList.innerHTML = '<div class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">フォーマットがありません<br>右上から登録してください</div>';
+                    return;
+                }
+                
+                const sortedTemplates = [...this.data.templates].sort((a, b) => {
+                    if (!!a.isFavorite === !!b.isFavorite) return 0;
+                    return a.isFavorite ? -1 : 1;
+                });
+
+                sortedTemplates.forEach(tmpl => {
+                    const btn = document.createElement('button');
+                    btn.className = 'w-full text-left px-4 py-2.5 text-sm font-bold text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors truncate flex items-center gap-2';
+                    
+                    const icon = tmpl.isFavorite 
+                        ? '<i class="fas fa-star text-yellow-400 text-xs w-3 shrink-0"></i>' 
+                        : '<i class="fas fa-star text-transparent text-xs w-3 shrink-0"></i>';
+
+                    btn.innerHTML = `${icon} <span class="truncate">${tmpl.title || "無題のフォーマット"}</span>`;
+                    btn.onclick = () => {
+                        this.insertTemplateContent(tmpl.content);
+                        this.dom.dropdownTemplateList.classList.add('hidden');
+                        this.dom.dropdownTemplateList.classList.remove('flex');
+                    };
+                    this.dom.dropdownTemplateList.appendChild(btn);
+                });
+            },
+
+            insertTemplateContent(contentToInsert) {
+                if (!contentToInsert) return;
+
+                if (!this.data.currentId) {
+                    this.createNewPrompt(contentToInsert);
+                } else {
+                    const input = this.dom.contentInput;
+                    const startPos = input.selectionStart;
+                    const endPos = input.selectionEnd;
+                    const text = input.value;
+                    
+                    const newValue = text.substring(0, startPos) + contentToInsert + text.substring(endPos, text.length);
+                    input.value = newValue;
+                    
+                    const index = this.data.prompts.findIndex(p => p.id === this.data.currentId);
+                    if (index !== -1) {
+                        this.data.prompts[index].content = newValue;
+                        this.data.prompts[index].updatedAt = Date.now();
+                        
+                        // 先頭に移動 (ピン留め状態も考慮して移動されるが、ここでは単純に配列操作し、描画時にソートされる)
+                        const updatedPrompt = this.data.prompts.splice(index, 1)[0];
+                        this.data.prompts.unshift(updatedPrompt);
+                        
+                        this.saveData();
+                        this.renderList();
+                        
+                        const dateStr = new Date(updatedPrompt.updatedAt).toLocaleString();
+                        this.dom.lastEdited.textContent = `最終更新: ${dateStr}`;
+                    }
+                    
+                    input.focus();
+                    input.selectionStart = startPos + contentToInsert.length;
+                    input.selectionEnd = startPos + contentToInsert.length;
+                }
+                
+                this.showToast("フォーマットを挿入しました", "success");
+            },
+
+            renderTemplatesList() {
+                this.dom.templatesList.innerHTML = '';
+
+                if (this.data.templates.length === 0) {
+                    this.dom.templatesList.classList.add('hidden');
+                    this.dom.templatesEmptyMsg.classList.remove('hidden');
+                } else {
+                    this.dom.templatesList.classList.remove('hidden');
+                    this.dom.templatesEmptyMsg.classList.add('hidden');
+
+                    const sortedTemplates = [...this.data.templates].sort((a, b) => {
+                        if (!!a.isFavorite === !!b.isFavorite) return 0;
+                        return a.isFavorite ? -1 : 1;
+                    });
+
+                    sortedTemplates.forEach(tmpl => {
+                        const item = document.createElement('div');
+                        item.className = 'flex items-start gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors';
+
+                        const btnFav = document.createElement('button');
+                        btnFav.type = 'button';
+                        btnFav.className = `w-8 h-8 flex items-center justify-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                            tmpl.isFavorite 
+                            ? 'text-yellow-400 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/30' 
+                            : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`;
+                        btnFav.innerHTML = '<i class="fas fa-star"></i>';
+                        btnFav.onclick = () => this.toggleFavoriteTemplate(tmpl.id);
+
+                        const textDiv = document.createElement('div');
+                        textDiv.className = 'flex-1 min-w-0 pr-2';
+                        textDiv.innerHTML = `
+                            <div class="font-bold text-sm text-gray-800 dark:text-gray-200 truncate">${tmpl.title}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">${tmpl.content}</div>
+                        `;
+
+                        const btnDel = document.createElement('button');
+                        btnDel.type = 'button';
+                        btnDel.className = 'w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors shrink-0 mt-0.5';
+                        btnDel.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                        btnDel.onclick = () => this.deleteTemplate(tmpl.id);
+
+                        item.appendChild(btnFav);
+                        item.appendChild(textDiv);
+                        item.appendChild(btnDel);
+
+                        this.dom.templatesList.appendChild(item);
+                    });
+                }
+            },
+
+            // --- プロンプトデータ ---
+            loadData() {
+                try {
+                    const stored = localStorage.getItem('prompt_manager_data');
+                    if (stored) {
+                        this.data.prompts = JSON.parse(stored);
+                        this.data.prompts.forEach(p => {
+                            if (!p.tags) p.tags = [];
+                            if (p.isPinned === undefined) p.isPinned = false;
+                            if (p.isArchived === undefined) p.isArchived = false;
+                        });
+                        // ピン留め優先、その後更新日時降順でソート
+                        this.data.prompts.sort((a, b) => {
+                            if (a.isPinned && !b.isPinned) return -1;
+                            if (!a.isPinned && b.isPinned) return 1;
+                            return b.updatedAt - a.updatedAt;
+                        });
+                    }
+                } catch (e) {
+                    console.error("データの読み込みに失敗しました:", e);
+                    this.showToast("データの読み込みに失敗しました", "error");
+                    this.data.prompts = [];
+                }
+            },
+
+            saveData() {
+                try {
+                    localStorage.setItem('prompt_manager_data', JSON.stringify(this.data.prompts));
+                } catch (e) {
+                    console.error("データの保存に失敗しました:", e);
+                    this.showToast("保存に失敗しました。", "error");
+                }
+            },
+
+            createNewPrompt(initialContent = "") {
+                const newId = crypto.randomUUID ? crypto.randomUUID() : `id_${new Date().getTime()}`;
+                const newPrompt = {
+                    id: newId,
+                    title: "",
+                    content: initialContent,
+                    tags: [],
+                    isPinned: false,
+                    isArchived: false,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                };
+                
+                // 新規作成時はアクティブタブに強制切り替え
+                if (this.data.currentTab !== 'active') {
+                    this.switchTab('active');
+                }
+
+                this.data.prompts.unshift(newPrompt);
+                this.data.currentId = newId;
+                
+                this.saveData();
+                this.renderList();
+                this.updateEditorState();
+                this.dom.titleInput.focus();
+            },
+
+            saveCurrentPrompt() {
+                if (!this.data.currentId) return;
+
+                const title = this.dom.titleInput.value.trim() || "無題のプロンプト";
+                const content = this.dom.contentInput.value;
+                
+                const index = this.data.prompts.findIndex(p => p.id === this.data.currentId);
+                if (index !== -1) {
+                    this.data.prompts[index].title = title;
+                    this.data.prompts[index].content = content;
+                    this.data.prompts[index].tags = [...this.data.currentTags];
+                    this.data.prompts[index].updatedAt = Date.now();
+                    
+                    const updatedPrompt = this.data.prompts.splice(index, 1)[0];
+                    this.data.prompts.unshift(updatedPrompt);
+                    
+                    this.saveData();
+                    this.renderList();
+                    this.updateEditorState();
+                    this.showToast("ポストを保存しました", "success");
+                }
+            },
+
+            deleteCurrentPrompt() {
+                if (!this.data.currentId) return;
+                
+                this.data.prompts = this.data.prompts.filter(p => p.id !== this.data.currentId);
+                this.data.currentId = null;
+                
+                this.saveData();
+                this.renderList();
+                this.updateEditorState();
+                this.showToast("削除しました", "info");
+            },
+
+            togglePinCurrent() {
+                if (!this.data.currentId) return;
+                
+                const prompt = this.data.prompts.find(p => p.id === this.data.currentId);
+                if (prompt) {
+                    prompt.isPinned = !prompt.isPinned;
+                    this.saveData();
+                    this.renderList();
+                    this.updateEditorState();
+                    this.showToast(prompt.isPinned ? "ピン留めしました" : "ピン留めを解除しました", "success");
+                }
+            },
+
+            toggleArchiveCurrent() {
+                if (!this.data.currentId) return;
+                
+                const prompt = this.data.prompts.find(p => p.id === this.data.currentId);
+                if (prompt) {
+                    prompt.isArchived = !prompt.isArchived;
+                    this.saveData();
+                    
+                    // アーカイブ状態が変わったので、現在のタブに合わなければ選択を解除する
+                    if ((this.data.currentTab === 'active' && prompt.isArchived) || 
+                        (this.data.currentTab === 'archived' && !prompt.isArchived)) {
+                        this.data.currentId = null;
+                    }
+
+                    this.renderList();
+                    this.updateEditorState();
+                    this.showToast(prompt.isArchived ? "アーカイブに移動しました" : "アクティブに戻しました", "success");
+                }
+            },
+
+            copyToClipboard() {
+                const content = this.dom.contentInput.value;
+                if (!content) {
+                    this.showToast("コピーする内容がありません", "error");
+                    return;
+                }
+
+                const textArea = document.createElement("textarea");
+                textArea.value = content;
+                textArea.style.position = "absolute";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    this.showToast("クリップボードにコピーしました", "success");
+                } catch (err) {
+                    this.showToast("コピーに失敗しました", "error");
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            },
+
+            selectPrompt(id) {
+                this.data.currentId = id;
+                this.renderList();
+                this.updateEditorState();
+            },
+
+            // --- タグサジェスト機能 ---
+            getAllUniqueTags() {
+                const tagsSet = new Set();
+                this.data.prompts.forEach(p => {
+                    if (p.tags) {
+                        p.tags.forEach(t => tagsSet.add(t));
+                    }
+                });
+                return Array.from(tagsSet);
+            },
+
+            handleTagSuggest(e) {
+                const inputValue = e.target.value.trim().replace(/^#/, '').toLowerCase();
+                const allTags = this.getAllUniqueTags();
+                
+                // 現在設定済みのタグは除外
+                const availableTags = allTags.filter(t => !this.data.currentTags.includes(t));
+                
+                let matchedTags = availableTags;
+                if (inputValue) {
+                    matchedTags = availableTags.filter(t => t.toLowerCase().includes(inputValue));
+                }
+
+                this.renderTagSuggestions(matchedTags);
+            },
+
+            renderTagSuggestions(tags) {
+                if (!this.dom.tagSuggestions) return;
+                
+                this.dom.tagSuggestions.innerHTML = '';
+                
+                if (tags.length === 0) {
+                    this.dom.tagSuggestions.classList.add('hidden');
+                    this.dom.tagSuggestions.classList.remove('flex');
+                    return;
+                }
+
+                tags.forEach(tag => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'w-full text-left px-4 py-2 text-sm font-bold text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors truncate';
+                    btn.textContent = `#${tag}`;
+                    btn.onclick = () => {
+                        this.addTag(tag);
+                        this.dom.tagSuggestions.classList.add('hidden');
+                        this.dom.tagSuggestions.classList.remove('flex');
+                        this.dom.inputTag.focus(); // 連続入力のためにフォーカスを戻す
+                    };
+                    this.dom.tagSuggestions.appendChild(btn);
+                });
+
+                this.dom.tagSuggestions.classList.remove('hidden');
+                this.dom.tagSuggestions.classList.add('flex');
+            },
+
+            addTag(tag) {
+                if (tag && !this.data.currentTags.includes(tag)) {
+                    this.data.currentTags.push(tag);
+                    this.renderTagsEditor();
+                }
+                this.dom.inputTag.value = '';
+                // サジェストリストの表示も更新
+                this.handleTagSuggest({ target: this.dom.inputTag });
+            },
+
+            handleTagInput(e) {
+                if (e.isComposing) return;
+                
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    let tag = e.target.value.trim();
+                    if (tag.startsWith('#')) tag = tag.slice(1);
+                    
+                    if (tag) {
+                        this.addTag(tag);
+                        this.dom.tagSuggestions.classList.add('hidden');
+                        this.dom.tagSuggestions.classList.remove('flex');
+                    }
+                }
+            },
+
+            removeTag(tagToRemove) {
+                this.data.currentTags = this.data.currentTags.filter(tag => tag !== tagToRemove);
+                this.renderTagsEditor();
+            },
+
+            renderTagsEditor() {
+                this.dom.tagsContainer.innerHTML = '';
+                this.data.currentTags.forEach(tag => {
+                    const tagEl = document.createElement('span');
+                    tagEl.className = 'inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-full shadow-sm';
+                    
+                    const textNode = document.createTextNode(`#${tag}`);
+                    
+                    const btn = document.createElement('button');
+                    btn.innerHTML = '<i class="fas fa-times"></i>';
+                    btn.className = 'text-gray-400 hover:text-black dark:hover:text-white focus:outline-none transition-colors ml-1';
+                    btn.onclick = () => this.removeTag(tag);
+                    
+                    tagEl.appendChild(textNode);
+                    tagEl.appendChild(btn);
+                    this.dom.tagsContainer.appendChild(tagEl);
+                });
+            },
+
+            handleSearch(event) {
+                this.data.searchQuery = event.target.value.toLowerCase();
+                this.renderList();
+            },
+
+            // --- CSV機能 ---
+            exportToCSV() {
+                if (this.data.prompts.length === 0) {
+                    this.showToast("エクスポートするデータがありません", "error");
+                    return;
+                }
+
+                try {
+                    let csvContent = "ID,タイトル,プロンプト内容,作成日時,最終更新日時,タグ,ピン留め,アーカイブ\n";
+                    
+                    this.data.prompts.forEach(p => {
+                        const id = p.id;
+                        const escapeCSV = (str) => `"${String(str).replace(/"/g, '""')}"`;
+                        
+                        const title = escapeCSV(p.title);
+                        const content = escapeCSV(p.content);
+                        const created = escapeCSV(new Date(p.createdAt).toLocaleString());
+                        const updated = escapeCSV(new Date(p.updatedAt).toLocaleString());
+                        const tags = escapeCSV((p.tags || []).join(';'));
+                        const isPinned = p.isPinned ? "1" : "0";
+                        const isArchived = p.isArchived ? "1" : "0";
+                        
+                        csvContent += `${id},${title},${content},${created},${updated},${tags},${isPinned},${isArchived}\n`;
+                    });
+
+                    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+                    
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `Prompt-X_export_${new Date().getTime()}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    this.showToast("CSVをエクスポートしました", "success");
+                } catch (e) {
+                    this.showToast("エクスポートに失敗しました", "error");
+                }
+            },
+
+            importFromCSV(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        let text = e.target.result;
+                        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+                        
+                        const rows = this.parseCSV(text);
+                        if (rows.length < 2) {
+                            this.showToast("有効なデータが見つかりません", "error");
+                            return;
+                        }
+
+                        let importCount = 0;
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (row.length < 3) continue;
+                            
+                            let id = row[0] || (crypto.randomUUID ? crypto.randomUUID() : `id_${new Date().getTime()}_${i}`);
+                            const title = row[1] || "無題のプロンプト";
+                            const content = row[2] || "";
+                            
+                            let createdAt = Date.now();
+                            let updatedAt = Date.now();
+                            if (row[3]) {
+                                const parsedCreated = Date.parse(row[3]);
+                                if (!isNaN(parsedCreated)) createdAt = parsedCreated;
+                            }
+                            if (row[4]) {
+                                const parsedUpdated = Date.parse(row[4]);
+                                if (!isNaN(parsedUpdated)) updatedAt = parsedUpdated;
+                            }
+
+                            const tagsStr = row[5] || "";
+                            const tags = tagsStr ? tagsStr.split(';').map(t => t.trim()).filter(t => t) : [];
+                            
+                            const isPinned = row[6] === "1" || row[6] === "true";
+                            const isArchived = row[7] === "1" || row[7] === "true";
+
+                            const existingIndex = this.data.prompts.findIndex(p => p.id === id);
+                            if (existingIndex !== -1) {
+                                id = crypto.randomUUID ? crypto.randomUUID() : `id_${new Date().getTime()}_${i}_imported`;
+                            }
+                            this.data.prompts.push({ id, title, content, createdAt, updatedAt, tags, isPinned, isArchived });
+                            importCount++;
+                        }
+
+                        if (importCount > 0) {
+                            this.data.prompts.sort((a, b) => {
+                                if (a.isPinned && !b.isPinned) return -1;
+                                if (!a.isPinned && b.isPinned) return 1;
+                                return b.updatedAt - a.updatedAt;
+                            });
+                            this.saveData();
+                            this.renderList();
+                            this.showToast(`${importCount}件のプロンプトを反映しました`, "success");
+                        } else {
+                            this.showToast("インポートできるデータがありませんでした", "error");
+                        }
+                    } catch (err) {
+                        this.showToast("ファイルの読み込みに失敗しました", "error");
+                    } finally {
+                        event.target.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            parseCSV(text) {
+                const result = [];
+                let row = [];
+                let inQuotes = false;
+                let currentVal = '';
+                
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    const nextChar = text[i + 1];
+
+                    if (inQuotes) {
+                        if (char === '"' && nextChar === '"') {
+                            currentVal += '"';
+                            i++;
+                        } else if (char === '"') {
+                            inQuotes = false;
+                        } else {
+                            currentVal += char;
+                        }
+                    } else {
+                        if (char === '"') {
+                            inQuotes = true;
+                        } else if (char === ',') {
+                            row.push(currentVal);
+                            currentVal = '';
+                        } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+                            row.push(currentVal);
+                            result.push(row);
+                            row = [];
+                            currentVal = '';
+                            if (char === '\r') i++;
+                        } else {
+                            currentVal += char;
+                        }
+                    }
+                }
+                if (currentVal !== '' || row.length > 0) {
+                    row.push(currentVal);
+                    result.push(row);
+                }
+                return result;
+            },
+
+            // --- 共有機能 ---
+            openShareModal() {
+                if (!this.data.currentId) return;
+
+                const content = this.dom.contentInput.value;
+                if (!content) {
+                    this.showToast("共有するコンテンツがありません", "error");
+                    return;
+                }
+
+                this.dom.shareEmailList.innerHTML = '';
+                
+                if (this.data.settings.emails.length === 0) {
+                    this.dom.shareEmailList.classList.add('hidden');
+                    this.dom.shareNoEmailMsg.classList.remove('hidden');
+                    this.dom.btnExecuteShare.disabled = true;
+                    this.dom.btnExecuteShare.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    this.dom.shareEmailList.classList.remove('hidden');
+                    this.dom.shareNoEmailMsg.classList.add('hidden');
+                    this.dom.btnExecuteShare.disabled = false;
+                    this.dom.btnExecuteShare.classList.remove('opacity-50', 'cursor-not-allowed');
+
+                    this.data.settings.emails.forEach((email) => {
+                        const label = document.createElement('label');
+                        label.className = 'flex items-center gap-3 p-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer transition-colors';
+                        label.innerHTML = `
+                            <input type="checkbox" value="${email}" class="share-email-checkbox w-4 h-4 text-black bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-black dark:focus:ring-gray-500" checked>
+                            <span class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">${email}</span>
+                        `;
+                        this.dom.shareEmailList.appendChild(label);
+                    });
+                }
+
+                this.dom.shareModal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    this.dom.shareModal.classList.remove('opacity-0');
+                    this.dom.shareModal.firstElementChild.classList.remove('scale-95');
+                });
+            },
+
+            closeShareModal() {
+                this.dom.shareModal.classList.add('opacity-0');
+                this.dom.shareModal.firstElementChild.classList.add('scale-95');
+                setTimeout(() => {
+                    this.dom.shareModal.classList.add('hidden');
+                }, 300);
+            },
+
+            executeShare() {
+                const checkboxes = this.dom.shareEmailList.querySelectorAll('.share-email-checkbox:checked');
+                const selectedEmails = Array.from(checkboxes).map(cb => cb.value);
+
+                if (selectedEmails.length === 0 && this.data.settings.emails.length > 0) {
+                    this.showToast("送信先を1つ以上選択してください", "error");
+                    return;
+                }
+
+                const title = this.dom.titleInput.value.trim() || "無題のプロンプト";
+                const content = this.dom.contentInput.value;
+
+                const emailStr = selectedEmails.join(',');
+                const subject = encodeURIComponent(`【Prompt-X】${title}`);
+                const tagsStr = this.data.currentTags.length > 0 ? `Tags: ${this.data.currentTags.map(t=>`#${t}`).join(' ')}\n` : '';
+                const body = encodeURIComponent(`以下のプロンプトを共有します。\n\n${tagsStr}---\n${content}\n---\n\nShared via Prompt-X`);
+
+                if (this.data.settings.useGmailWeb !== false) {
+                    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${emailStr}&su=${subject}&body=${body}`;
+                    window.open(gmailUrl, '_blank');
+                    this.showToast("Gmailを開いています...", "info");
+                } else {
+                    window.location.href = `mailto:${emailStr}?subject=${subject}&body=${body}`;
+                    this.showToast("メーラーを起動しています...", "info");
+                }
+
+                this.closeShareModal();
+            },
+
+            // --- UI 描画 ---
+            renderList() {
+                this.dom.list.innerHTML = '';
+                
+                // タブと検索でフィルタリング
+                let filteredPrompts = this.data.prompts.filter(prompt => {
+                    // タブフィルタ
+                    if (this.data.currentTab === 'active' && prompt.isArchived) return false;
+                    if (this.data.currentTab === 'archived' && !prompt.isArchived) return false;
+                    
+                    // 検索フィルタ
+                    if (!this.data.searchQuery) return true;
+                    const query = this.data.searchQuery;
+                    const titleMatch = (prompt.title || "").toLowerCase().includes(query);
+                    const contentMatch = (prompt.content || "").toLowerCase().includes(query);
+                    const tagsMatch = (prompt.tags || []).some(tag => tag.toLowerCase().includes(query));
+                    return titleMatch || contentMatch || tagsMatch;
+                });
+
+                // ピン留め優先、その後更新日時降順でソート（データはソート済みだが念のため）
+                filteredPrompts.sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    return b.updatedAt - a.updatedAt;
+                });
+
+                if (filteredPrompts.length === 0) {
+                    this.dom.emptyList.classList.remove('hidden');
+                    if (this.data.prompts.length > 0 && this.data.searchQuery) {
+                        this.dom.emptyList.innerHTML = '検索結果がありません。';
+                    } else if (this.data.currentTab === 'archived') {
+                        this.dom.emptyList.innerHTML = 'アーカイブされたプロンプトはありません。';
+                    } else {
+                        this.dom.emptyList.innerHTML = 'プロンプトがありません。<br>右上の「+」からポストしてください。';
+                    }
+                    return;
+                }
+                
+                this.dom.emptyList.classList.add('hidden');
+
+                const ul = document.createElement('ul');
+                ul.className = 'flex flex-col gap-1';
+
+                filteredPrompts.forEach(prompt => {
+                    const isActive = prompt.id === this.data.currentId;
+                    const li = document.createElement('li');
+                    
+                    li.className = `p-3 px-4 cursor-pointer transition-colors border-r-4 ${
+                        isActive 
+                        ? 'bg-gray-100 dark:bg-gray-800 border-black dark:border-white' 
+                        : 'bg-white dark:bg-gray-950 border-transparent hover:bg-gray-50 dark:hover:bg-gray-900'
+                    }`;
+                    
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = `font-bold truncate flex items-center justify-between ${isActive ? 'text-black dark:text-white' : 'text-gray-800 dark:text-gray-300'}`;
+                    
+                    const titleText = document.createElement('span');
+                    titleText.className = 'truncate pr-2';
+                    titleText.textContent = prompt.title || "無題のプロンプト";
+                    titleDiv.appendChild(titleText);
+                    
+                    if (prompt.isPinned) {
+                        const pinIcon = document.createElement('i');
+                        pinIcon.className = 'fas fa-thumbtack text-xs text-black dark:text-white shrink-0 transform -rotate-45';
+                        titleDiv.appendChild(pinIcon);
+                    }
+
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = 'text-xs text-gray-500 dark:text-gray-500 mt-1';
+                    
+                    const updateDate = new Date(prompt.updatedAt);
+                    const today = new Date();
+                    const isToday = updateDate.getDate() === today.getDate() && updateDate.getMonth() === today.getMonth() && updateDate.getFullYear() === today.getFullYear();
+                    
+                    dateDiv.textContent = isToday 
+                        ? updateDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                        : updateDate.toLocaleDateString();
+
+                    li.appendChild(titleDiv);
+                    
+                    if (prompt.tags && prompt.tags.length > 0) {
+                        const tagsDiv = document.createElement('div');
+                        tagsDiv.className = 'flex flex-wrap gap-1 mt-1.5';
+                        prompt.tags.forEach(tag => {
+                            const tagSpan = document.createElement('span');
+                            tagSpan.className = `inline-block px-1.5 py-0.5 text-[11px] font-bold rounded truncate max-w-full text-blue-500 dark:text-blue-400`;
+                            tagSpan.textContent = `#${tag}`;
+                            tagsDiv.appendChild(tagSpan);
+                        });
+                        li.appendChild(tagsDiv);
+                    }
+
+                    li.appendChild(dateDiv);
+                    
+                    li.addEventListener('click', () => this.selectPrompt(prompt.id));
+                    ul.appendChild(li);
+                });
+
+                this.dom.list.appendChild(ul);
+            },
+
+            updateEditorState() {
+                if (!this.data.currentId) {
+                    this.dom.placeholder.classList.remove('hidden');
+                    this.dom.editorContainer.classList.add('hidden');
+                    return;
+                }
+
+                const currentPrompt = this.data.prompts.find(p => p.id === this.data.currentId);
+                if (!currentPrompt) return;
+
+                this.dom.placeholder.classList.add('hidden');
+                this.dom.editorContainer.classList.remove('hidden');
+
+                this.dom.titleInput.value = currentPrompt.title;
+                this.dom.contentInput.value = currentPrompt.content;
+                
+                this.data.currentTags = currentPrompt.tags ? [...currentPrompt.tags] : [];
+                this.renderTagsEditor();
+                this.dom.inputTag.value = '';
+                
+                // ピン状態のUI更新
+                if (currentPrompt.isPinned) {
+                    this.dom.btnPin.classList.add('text-black', 'dark:text-white', 'bg-gray-100', 'dark:bg-gray-800');
+                    this.dom.btnPin.classList.remove('text-gray-400');
+                    this.dom.btnPin.querySelector('i').classList.add('-rotate-45'); // 刺さっている感じ
+                } else {
+                    this.dom.btnPin.classList.remove('text-black', 'dark:text-white', 'bg-gray-100', 'dark:bg-gray-800');
+                    this.dom.btnPin.classList.add('text-gray-400');
+                    this.dom.btnPin.querySelector('i').classList.remove('-rotate-45');
+                }
+
+                // アーカイブ状態のUI更新
+                if (currentPrompt.isArchived) {
+                    this.dom.btnArchive.classList.add('text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30');
+                    this.dom.btnArchive.classList.remove('text-gray-700', 'dark:text-gray-300', 'bg-transparent');
+                    this.dom.btnArchive.title = "アクティブに戻す";
+                    this.dom.btnArchive.innerHTML = '<i class="fas fa-box-open"></i>';
+                } else {
+                    this.dom.btnArchive.classList.remove('text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30');
+                    this.dom.btnArchive.classList.add('text-gray-700', 'dark:text-gray-300', 'bg-transparent');
+                    this.dom.btnArchive.title = "アーカイブ";
+                    this.dom.btnArchive.innerHTML = '<i class="fas fa-box-archive"></i>';
+                }
+
+                const dateStr = new Date(currentPrompt.updatedAt).toLocaleString();
+                this.dom.lastEdited.textContent = `最終更新: ${dateStr}`;
+            },
+
+            showToast(message, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                
+                let iconClass = type === 'success' ? 'fa-check' : (type === 'error' ? 'fa-exclamation' : 'fa-info');
+                
+                // ダークモード対応のToastカラー
+                toast.className = `bg-gray-800 dark:bg-gray-700 text-white px-5 py-3 rounded-full shadow-lg flex items-center gap-3 text-sm font-bold pointer-events-auto transform transition-all duration-300 translate-y-10 opacity-0 mb-2`;
+                
+                toast.innerHTML = `
+                    <i class="fas ${iconClass}"></i>
+                    <span>${message}</span>
+                `;
+
+                container.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        toast.classList.remove('translate-y-10', 'opacity-0');
+                    });
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('translate-y-10', 'opacity-0');
+                    toast.addEventListener('transitionend', () => {
+                        toast.remove();
+                    });
+                }, 3000);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            PromptApp.init();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
