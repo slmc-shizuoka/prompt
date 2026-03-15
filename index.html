@@ -155,7 +155,14 @@
             <h2 class="text-xl font-bold mb-6 text-black dark:text-white flex items-center"><i class="fas fa-cog mr-2"></i>設定</h2>
             
             <div class="mb-5">
-                <label class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">送信先の登録</label>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="block text-sm font-bold text-gray-800 dark:text-gray-200">送信先の登録</label>
+                    <div class="flex gap-3">
+                        <button id="btn-import-email-csv" class="text-xs text-gray-500 hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"><i class="fas fa-file-import"></i> インポート</button>
+                        <input type="file" id="input-import-email-csv" accept=".csv" class="hidden">
+                        <button id="btn-export-email-csv" class="text-xs text-gray-500 hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"><i class="fas fa-file-csv"></i> エクスポート</button>
+                    </div>
+                </div>
                 <div class="flex flex-col sm:flex-row gap-2 mb-2">
                     <!-- 名前入力用に追加 -->
                     <input type="text" id="input-new-name" placeholder="名前 (例: 山田太郎)" 
@@ -374,6 +381,9 @@
                     btnSettings: document.getElementById('btn-settings'),
                     btnTemplates: document.getElementById('btn-templates'),
                     settingsModal: document.getElementById('settings-modal'),
+                    btnImportEmailCSV: document.getElementById('btn-import-email-csv'),
+                    inputImportEmailCSV: document.getElementById('input-import-email-csv'),
+                    btnExportEmailCSV: document.getElementById('btn-export-email-csv'),
                     inputNewName: document.getElementById('input-new-name'),     // 新規追加
                     inputNewEmail: document.getElementById('input-new-email'),
                     btnAddEmail: document.getElementById('btn-add-email'),
@@ -462,6 +472,10 @@
                     }
                 });
                 this.dom.btnAddEmail.addEventListener('click', () => this.addEmailToSettings());
+
+                this.dom.btnImportEmailCSV.addEventListener('click', () => this.dom.inputImportEmailCSV.click());
+                this.dom.inputImportEmailCSV.addEventListener('change', (e) => this.importEmailsFromCSV(e));
+                this.dom.btnExportEmailCSV.addEventListener('click', () => this.exportEmailsToCSV());
 
                 this.dom.btnCloseShare.addEventListener('click', () => this.closeShareModal());
                 this.dom.btnExecuteShare.addEventListener('click', () => this.executeShare());
@@ -592,6 +606,100 @@
                     });
                     this.dom.settingsEmailList.appendChild(li);
                 });
+            },
+
+            exportEmailsToCSV() {
+                if (this.data.tempEmails.length === 0) {
+                    this.showToast("エクスポートする宛先がありません", "error");
+                    return;
+                }
+                try {
+                    let csvContent = "名前,メールアドレス\n";
+                    this.data.tempEmails.forEach(item => {
+                        const escapeCSV = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+                        csvContent += `${escapeCSV(item.name)},${escapeCSV(item.email)}\n`;
+                    });
+
+                    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+                    
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `Prompt-X_emails_${new Date().getTime()}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    this.showToast("宛先CSVをエクスポートしました", "success");
+                } catch (e) {
+                    this.showToast("エクスポートに失敗しました", "error");
+                }
+            },
+
+            importEmailsFromCSV(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        let text = e.target.result;
+                        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+                        
+                        const rows = this.parseCSV(text);
+                        if (rows.length < 2) {
+                            this.showToast("有効なデータが見つかりません", "error");
+                            return;
+                        }
+
+                        let importCount = 0;
+                        let skipCount = 0;
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            let name = "";
+                            let email = "";
+                            
+                            if (row.length === 1) {
+                                email = row[0].trim();
+                            } else if (row.length >= 2) {
+                                if (row[1].includes('@')) {
+                                    name = row[0].trim();
+                                    email = row[1].trim();
+                                } else if (row[0].includes('@')) {
+                                    email = row[0].trim();
+                                    name = row[1].trim();
+                                } else {
+                                    name = row[0].trim();
+                                    email = row[1].trim();
+                                }
+                            }
+                            
+                            if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                const isExist = this.data.tempEmails.some(item => item.email === email);
+                                if (!isExist) {
+                                    this.data.tempEmails.push({ name: name, email: email });
+                                    importCount++;
+                                } else {
+                                    skipCount++;
+                                }
+                            }
+                        }
+
+                        if (importCount > 0) {
+                            this.renderSettingsEmailList();
+                            this.showToast(`${importCount}件の宛先を追加しました${skipCount > 0 ? `（${skipCount}件重複スキップ）` : ''}`, "success");
+                        } else {
+                            this.showToast("インポートできる新しい宛先がありませんでした", "error");
+                        }
+                    } catch (err) {
+                        this.showToast("ファイルの読み込みに失敗しました", "error");
+                    } finally {
+                        event.target.value = '';
+                    }
+                };
+                reader.readAsText(file);
             },
 
             openSettingsModal() {
